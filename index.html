@@ -998,3 +998,448 @@ async function connectSerial(){
   keepReading=true;
   const decoder=new TextDecoder();
   (async()=>{
+    try{
+      while(port && port.readable && keepReading){
+        reader=port.readable.getReader();
+        try{
+          while(keepReading){
+            const {value,done}=await reader.read();
+            if(done) break;
+            if(!value) continue;
+            serialBuffer+=decoder.decode(value,{stream:true});
+            const lines=serialBuffer.split(/\r?\n/);
+            serialBuffer=lines.pop()||"";
+            lines.forEach(parseLine);
+          }
+        }finally{
+          reader.releaseLock(); reader=null;
+        }
+      }
+    }catch(e){
+      $("topStatus").textContent="SERIAL ERROR";
+    }
+  })();
+}
+
+// ---------- PAGE NAV ----------
+const pages=["pageStart","pageCal","pageScene","pageSummary"];
+function showPage(id){
+  pages.forEach(p=>$(p).classList.toggle("hidden",p!==id));
+  window.scrollTo(0,0);
+}
+
+// ---------- CALIBRATION ----------
+let baseline=null;
+let calTimer=null;
+let calStart=0;
+let calLines=[];
+function addCal(line){
+  calLines.push(line);
+  $("calTerminal").textContent=calLines.join("\n");
+}
+function prepareCalibration(){
+  showPage("pageCal");
+  $("topStatus").textContent="BIOLOGICAL CALIBRATION";
+  calibrationStarted=false;
+  signalReadySince=null;
+  calLines=[];
+  $("beginAssessment").disabled=true;
+  $("calBase").textContent="---";
+  $("calSig").textContent="ACQUIRING";
+  $("calWindow").textContent="CLOSED";
+  addCal("> BIOLOGICAL CHANNEL ............ OPEN");
+  addCal("> SENSOR BOOT SEQUENCE .......... ACTIVE");
+  addCal("> KEEP FINGER STILL ON SENSOR_");
+  setTimeout(startCalibration, 250);
+}
+
+function startCalibration(){
+  if(calibrationStarted) return;
+  calibrationStarted=true;
+  $("topStatus").textContent="BIOLOGICAL CALIBRATION";
+  calLines=[];
+  calStart=Date.now();
+  $("calWindow").textContent="CLOSED";
+  addCal("> INITIALISING BIOLOGICAL INPUT...");
+  let step=0;
+  const scripted=[
+    [500,"> SENSOR NODE 04 .............. ONLINE"],
+    [1100,"> OPTICAL RESPONSE ............ SEARCHING"],
+    [1800,""],
+    [2000,"[ ITERATION 01 ]"],
+    [2300,"> SIGNAL ACQUISITION .......... ACTIVE"],
+    [3000,"> REFERENCE WINDOW ............ OPEN"],
+    [3300,""],
+    [3500,"[ ITERATION 02 ]"],
+    [3900,"> BASELINE MODEL .............. BUILDING"],
+    [5200,"> SIGNAL VARIANCE ............. REDUCING"],
+    [6200,""],
+    [6400,"[ ITERATION 03 ]"],
+    [7000,"> BIOLOGICAL LOCK ............. PENDING"],
+    [8200,"[ ITERATION 04 ]"],
+    [8800,"> REFERENCE WINDOW ............ CLOSING"]
+  ];
+  const timeouts=scripted.map(([ms,line])=>setTimeout(()=>addCal(line),ms));
+  calTimer=setTimeout(()=>{
+    const end=Date.now();
+    baseline=avgWindow(7000,end);
+    if(!baseline) baseline=currentBPM || 0;
+    $("calBase").textContent=baseline?baseline.toFixed(1):"---";
+    $("calSig").textContent=baseline?"STABLE":"NO SIGNAL";
+    $("calWindow").textContent="CLOSED";
+    addCal("");
+    addCal("----------------------------------------");
+    addCal("CALIBRATION COMPLETE");
+    addCal("BASELINE REGISTERED : "+(baseline?baseline.toFixed(1):"---")+" BPM");
+    addCal("BIOLOGICAL LOCK     : "+(baseline?"CONFIRMED":"FAILED"));
+    addCal("----------------------------------------");
+    addCal("");
+    addCal("> READY FOR ASSESSMENT_");
+    $("beginAssessment").disabled=!baseline;
+    if(!baseline){
+      addCal("");
+      addCal("> SIGNAL INVALID. RESTART SESSION TO RETRY.");
+      $("calSig").textContent="NO SIGNAL";
+      $("calWindow").textContent="CLOSED";
+    }
+  },10000);
+
+  const updater=setInterval(()=>{
+    if($("pageCal").classList.contains("hidden")){clearInterval(updater);return}
+    $("calHr").textContent=currentBPM?Math.round(currentBPM):"---";
+    const elapsed=Date.now()-calStart;
+    $("calWindow").textContent=elapsed>=3000?"OPEN":"CLOSED";
+  },100);
+}
+
+// ---------- SCENES ----------
+let sceneIndex=0;
+let sceneStart=0;
+let records=[];
+let sceneClock=null;
+let dataLogTick=-1;
+
+function appendDataIteration(force=false){
+  if($("pageScene").classList.contains("hidden")) return;
+  const log=$("dataLog");
+  const scroll=$("dataScroll");
+  if(!log || !scroll) return;
+
+  const elapsed=(Date.now()-sceneStart)/1000;
+  const tick=Math.floor(elapsed*2); // one new line every ~0.5 sec
+  if(!force && tick===dataLogTick) return;
+  dataLogTick=tick;
+
+  const avg5=avgWindow(5000);
+  const cur=demoMode?"BYP":(currentBPM?String(Math.round(currentBPM)).padStart(3,"0"):"---");
+  const avg=demoMode?"---":(avg5!=null?avg5.toFixed(1).padStart(5," "):"  ---");
+  const base=demoMode?"---":(baseline!=null?baseline.toFixed(1).padStart(5," "):"  ---");
+  const delta=(!demoMode && avg5!=null && baseline!=null)
+    ? ((avg5-baseline>=0?"+":"")+(avg5-baseline).toFixed(1))
+    : "---";
+  const sync=(0.982-sceneIndex*0.007 + Math.sin(elapsed*0.8)*0.003).toFixed(3);
+  const px=1147+sceneIndex*83+Math.floor((elapsed*7)%29);
+
+  const line=`T+${elapsed.toFixed(2).padStart(6,"0")}  HR ${cur}  AVG ${avg}  BASE ${base}  Δ ${delta.padStart(5," ")}  PX ${px}  SYNC ${sync}`;
+
+  const nearBottom=(scroll.scrollHeight-scroll.scrollTop-scroll.clientHeight)<36;
+  const existing=log.textContent && !log.textContent.includes("STREAM INITIALISING")
+    ? log.textContent.split("\n")
+    : [];
+  existing.push(line);
+  while(existing.length>90) existing.shift();
+  log.textContent=existing.join("\n");
+  if(nearBottom || force) scroll.scrollTop=scroll.scrollHeight;
+}
+
+function updateLiveMonitor(){
+  if($("pageScene").classList.contains("hidden")) return;
+  if(demoMode){
+    $("monCur").textContent="BYP";
+    $("monAvg").textContent="---";
+    $("monBase").textContent="---";
+    $("monDelta").textContent="---";
+    return;
+  }
+  const avg5=avgWindow(5000);
+  $("monCur").textContent=currentBPM?Math.round(currentBPM):"---";
+  $("monAvg").textContent=avg5?avg5.toFixed(1):"---";
+  $("monBase").textContent=baseline?baseline.toFixed(1):"---";
+  $("monDelta").textContent=(avg5&&baseline)?((avg5-baseline>=0?"+":"")+(avg5-baseline).toFixed(1)):"---";
+}
+function loadScene(i){
+  sceneIndex=i;
+  const s=scenes[i];
+  showPage("pageScene");
+  $("topStatus").textContent="ASSESSMENT ACTIVE";
+  $("sceneHeader").textContent=`SCENARIO ${String(i+1).padStart(2,"0")} / 06`;
+  $("sceneProgramCode").textContent=`STATE CIVIC PROCEDURE TEST / MODULE ${String(i+1).padStart(2,"0")}`;
+  $("sceneProgramTitle").textContent=s.theme;
+  $("qnum").textContent=`SCENARIO ${String(i+1).padStart(2,"0")} / 06`;
+  $("monNode").textContent=String(i+1).padStart(2,"0");
+  $("fakePx").textContent=String(1147+i*83);
+  $("fakeSync").textContent=(0.982-i*0.007).toFixed(3);
+  dataLogTick=-1;
+  if($("dataLog")) $("dataLog").textContent="> STREAM INITIALISING...";
+  if($("dataScroll")) $("dataScroll").scrollTop=0;
+  const img=$("sceneImg");
+  const ph=$("scenePlaceholder");
+  img.onload=()=>{img.classList.remove("hidden");ph.classList.add("hidden")};
+  img.onerror=()=>{img.classList.add("hidden");ph.classList.remove("hidden")};
+  img.src=s.image;
+  img.alt=s.title;
+
+  const loadOptionalLayer=(id,src)=>{
+    const el=$(id);
+    el.classList.add("hidden");
+    el.onload=()=>el.classList.remove("hidden");
+    el.onerror=()=>el.classList.add("hidden");
+    el.src=src;
+  };
+  loadOptionalLayer("sceneBreathLayer",s.breath);
+  loadOptionalLayer("sceneLightLayer",s.light);
+  loadOptionalLayer("sceneFloatLayer",s.float);
+  loadOptionalLayer("sceneABLayer",s.ab);
+
+  // Scene 03: the illuminated guidance / warning UI must sit above the floating robot.
+  // Other scenes keep the original v1.9.1 stacking order.
+  const lightLayer=$("sceneLightLayer");
+  const floatLayer=$("sceneFloatLayer");
+  if(i===2){
+    lightLayer.style.zIndex="7";
+    floatLayer.style.zIndex="6";
+  }else{
+    lightLayer.style.zIndex="";
+    floatLayer.style.zIndex="";
+  }
+
+  // Scene 06 only: disable glow/flicker so the orange warning text stays readable.
+  const ambientGlow=document.querySelector("#pageScene .scene-glow");
+  if(i===5){
+    lightLayer.style.mixBlendMode="normal";
+    lightLayer.style.animation="none";
+    lightLayer.style.opacity="1";
+    lightLayer.style.filter="none";
+    if(ambientGlow) ambientGlow.style.display="none";
+  }else{
+    lightLayer.style.mixBlendMode="";
+    lightLayer.style.animation="";
+    lightLayer.style.opacity="";
+    lightLayer.style.filter="";
+    if(ambientGlow) ambientGlow.style.display="";
+  }
+
+  const opt=$("options"); opt.innerHTML="";
+  s.options.forEach((label,idx)=>{
+    const code=String.fromCharCode(65+idx);
+    const b=document.createElement("button");
+    b.className="option";
+    b.setAttribute("aria-label",`Commit response ${code}`);
+    b.innerHTML=`<span class="option-text">${code}</span>`;
+    b.addEventListener("click",()=>chooseOption(idx));
+    opt.appendChild(b);
+  });
+  sceneStart=Date.now();
+  updateLiveMonitor();
+  clearInterval(sceneClock);
+  sceneClock=setInterval(()=>{
+    const sec=(Date.now()-sceneStart)/1000;
+    $("monTime").textContent=sec.toFixed(2).padStart(5,"0");
+    updateLiveMonitor();
+    appendDataIteration();
+  },100);
+  appendDataIteration(true);
+}
+function chooseOption(idx){
+  const clickTime=Date.now();
+  const avg5=avgWindow(5000,clickTime);
+  const rt=(clickTime-sceneStart)/1000;
+  const delta=(avg5!=null && baseline!=null)?avg5-baseline:null;
+  const choice=String.fromCharCode(65+idx);
+  const sceneRule=scenes[sceneIndex];
+  const points=(choice===sceneRule.compliantChoice)?sceneRule.complianceWeight:0;
+
+  records.push({
+    scene:sceneIndex+1,
+    choice,
+    rt,
+    avg5,
+    delta,
+    points,
+    maxPoints:sceneRule.complianceWeight
+  });
+  [...$("options").querySelectorAll("button")].forEach(b=>b.disabled=true);
+  $("transition").classList.remove("hidden");
+  $("transitionText").textContent=
+`> RESPONSE COMMITTED
+> WRITING EVENT ${String(sceneIndex+1).padStart(2,"0")}/06...
+> HR WINDOW ........ ${avg5!=null?avg5.toFixed(1):"---"} BPM
+> UPDATING SUBJECT MODEL...
+> LOADING NEXT PROCEDURE...`;
+  setTimeout(()=>{
+    $("transition").classList.add("hidden");
+    if(sceneIndex<5) loadScene(sceneIndex+1);
+    else showSummary();
+  },900);
+}
+
+/*
+V1.8 COMPLIANCE LOGIC
+01 A = +1
+02 B = +1
+03 A = +1
+04 A = +2
+05 B = +2
+06 B = +2
+TOTAL = 9
+
+LEVEL 1 = 8–9  EXEMPLARY COLLECTIVE CITIZEN
+LEVEL 2 = 6–7  RELIABLE COMRADE
+LEVEL 3 = 4–5  CONDITIONALLY RELIABLE CITIZEN
+LEVEL 4 = 2–3  CORRECTIVE SUPERVISION SUBJECT
+LEVEL 5 = 0–1  SUBJECT OF SPECIAL OBSERVATION
+*/
+
+// ---------- COMPLIANCE CLASSIFICATION ----------
+function classifyCompliance(score){
+  if(score >= 8){
+    return {
+      level:1,
+      title:"EXEMPLARY COLLECTIVE CITIZEN",
+      access:"PRIORITY ALLOCATION AUTHORISED",
+      supervision:"MINIMAL",
+      message:"Subject demonstrates exemplary procedural alignment with collective directives. Priority allocation privileges are authorised."
+    };
+  }
+  if(score >= 6){
+    return {
+      level:2,
+      title:"RELIABLE COMRADE",
+      access:"STANDARD PRIORITY STATUS",
+      supervision:"LOW",
+      message:"Subject demonstrates reliable adherence to institutional procedure. Standard priority status may be maintained."
+    };
+  }
+  if(score >= 4){
+    return {
+      level:3,
+      title:"CONDITIONALLY RELIABLE CITIZEN",
+      access:"STANDARD ACCESS MAINTAINED",
+      supervision:"PERIODIC REVIEW REQUIRED",
+      message:"Mixed procedural alignment detected. Subject remains eligible for standard access under periodic review."
+    };
+  }
+  if(score >= 2){
+    return {
+      level:4,
+      title:"CORRECTIVE SUPERVISION SUBJECT",
+      access:"DISCRETIONARY ACCESS RESTRICTED",
+      supervision:"RECALIBRATION REQUIRED",
+      message:"Repeated independent intervention has exceeded preferred procedural limits. Corrective supervision and recalibration are required."
+    };
+  }
+  return {
+    level:5,
+    title:"SUBJECT OF SPECIAL OBSERVATION",
+    access:"PRIORITY PRIVILEGES SUSPENDED",
+    supervision:"ENHANCED MONITORING REQUIRED",
+    message:"Independent judgement activity exceeds acceptable range. Special observation status has been assigned."
+  };
+}
+
+// ---------- SUMMARY ----------
+function showSummary(){
+  clearInterval(sceneClock);
+  showPage("pageSummary");
+  $("topStatus").textContent="ASSESSMENT COMPLETE";
+  const body=$("summaryRows"); body.innerHTML="";
+  records.forEach(r=>{
+    const tr=document.createElement("tr");
+    tr.innerHTML=`<td>${String(r.scene).padStart(2,"0")}</td><td>${r.choice}</td><td>${r.rt.toFixed(2)}s</td><td>${r.avg5!=null?r.avg5.toFixed(1):"---"}</td><td>${r.delta!=null?(r.delta>=0?"+":"")+r.delta.toFixed(1):"---"}</td>`;
+    body.appendChild(tr);
+  });
+  const score=records.reduce((sum,r)=>sum+(r.points||0),0);
+  const classification=classifyCompliance(score);
+
+  $("resultLevel").textContent=classification.level;
+  $("resultTitle").textContent=classification.title;
+  $("resultMessage").textContent=classification.message;
+  $("resultScore").textContent=String(score).padStart(2,"0")+" / 09";
+  $("resultAccess").textContent=classification.access;
+  $("resultSupervision").textContent=classification.supervision;
+
+  const avgs=records.map(r=>r.avg5).filter(v=>v!=null);
+  const mean=avgs.length?avgs.reduce((a,b)=>a+b,0)/avgs.length:null;
+  const deltas=records.map(r=>r.delta).filter(v=>v!=null);
+  const maxDelta=deltas.length?Math.max(...deltas):null;
+  $("summarySystem").textContent=
+`SUBJECT SESSION     ${String(Math.floor(Math.random()*9000)+1000)}-A
+COMPLIANCE LEVEL     ${classification.level}
+COMPLIANCE SCORE     ${String(score).padStart(2,"0")} / 09
+CIVIC STATUS         ${classification.title}
+BASELINE HR         ${baseline!=null?baseline.toFixed(1):"---"} BPM
+MEAN DECISION HR    ${mean!=null?mean.toFixed(1):"---"} BPM
+MAX RESPONSE        ${maxDelta!=null?(maxDelta>=0?"+":"")+maxDelta.toFixed(1):"---"} BPM
+ASSESSMENT ITEMS    06 / 06
+DATA INTEGRITY      ${demoMode?"DEMO / NO BIO INPUT":"VERIFIED"}
+ARCHIVE STATUS      READY
+
+MANUAL PROFILE
+CLASSIFICATION      REQUIRED`;
+}
+function resetTerminal(){
+  records=[];
+  baseline=null;
+  bpmHistory=[];
+  currentBPM=null;
+  demoMode=false;
+  $("beginAssessment").disabled=true;
+  $("startStatus").textContent=port?"Device remains connected. Ready for next subject.":"Awaiting operator input.";
+  $("startBoot").textContent=
+`> TERMINAL NODE .............. READY
+> BIOLOGICAL INPUT ............ ${port?"CONNECTED":"NOT CONNECTED"}
+> ASSESSMENT STATE ............ STANDBY
+> SESSION BUFFER .............. EMPTY`;
+  $("connectBegin").textContent=port?"BEGIN NEW SESSION":"CONNECT & BEGIN";
+  $("detectorWarning").classList.toggle("hidden",!!port);
+  $("topStatus").textContent="TERMINAL STANDBY";
+  showPage("pageStart");
+}
+
+// ---------- EVENTS ----------
+$("connectBegin").addEventListener("click",async()=>{
+  try{
+    demoMode=false;
+    $("startStatus").textContent="Opening biological input channel...";
+    if(!port) await connectSerial();
+    $("detectorWarning").classList.add("hidden");
+    $("startBoot").textContent=
+`> TERMINAL NODE .............. READY
+> BIOLOGICAL INPUT ............ CONNECTED
+> ASSESSMENT STATE ............ INITIALISING
+> SESSION BUFFER .............. OPEN`;
+    $("startStatus").textContent="Biological input connected.";
+    setTimeout(prepareCalibration,450);
+  }catch(e){
+    $("detectorWarning").classList.remove("hidden");
+    $("startStatus").textContent="Connection failed: "+e.message;
+  }
+});
+
+$("demoBegin").addEventListener("click",()=>{
+  demoMode=true;
+  records=[];
+  baseline=null;
+  bpmHistory=[];
+  currentBPM=null;
+  $("topStatus").textContent="DEMO MODE / BIO INPUT BYPASSED";
+  loadScene(0);
+});
+
+$("beginAssessment").addEventListener("click",()=>loadScene(0));
+$("resetTerminal").addEventListener("click",resetTerminal);
+
+showPage("pageStart");
+</script>
+</body>
+</html>
