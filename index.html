@@ -1,0 +1,1000 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>TAIA Civic Compliance Assessment</title>
+<style>
+:root{
+  --bg:#070b09;
+  --panel:#0d1511;
+  --line:#234033;
+  --green:#7cff9c;
+  --green-dim:#4f9b66;
+  --amber:#d7a654;
+  --text:#c9d4cc;
+  --muted:#6f8277;
+  --danger:#b36a58;
+}
+*{box-sizing:border-box}
+html,body{margin:0;background:#050807;color:var(--text);font-family:"Courier New",ui-monospace,monospace}
+body{min-height:100vh;overflow-x:hidden}
+button{font:inherit}
+.hidden{display:none!important}
+.app{
+  width:min(1440px,100%);
+  margin:0 auto;
+  padding:28px;
+}
+.screen{
+  position:relative;
+  min-height:calc(100vh - 56px);
+  border:1px solid #20342b;
+  background:
+    radial-gradient(circle at center, rgba(50,90,63,.10), transparent 48%),
+    linear-gradient(180deg,#0b100e 0%,#080c0a 100%);
+  overflow:hidden;
+}
+.screen::before{
+  content:"";
+  pointer-events:none;
+  position:absolute;inset:0;
+  background:repeating-linear-gradient(
+    to bottom,
+    rgba(255,255,255,.018) 0px,
+    rgba(255,255,255,.018) 1px,
+    rgba(0,0,0,.06) 2px,
+    rgba(0,0,0,.06) 4px
+  );
+  mix-blend-mode:screen;
+  z-index:20;
+}
+.screen::after{
+  content:"";
+  pointer-events:none;
+  position:absolute;inset:0;
+  background:radial-gradient(ellipse at center, transparent 55%, rgba(0,0,0,.42) 100%);
+  z-index:21;
+}
+.crt-flicker{animation:crtFlicker 7s infinite}
+@keyframes crtFlicker{
+  0%,7%,9%,21%,100%{filter:brightness(1)}
+  8%{filter:brightness(.93)}
+  22%{filter:brightness(1.04)}
+}
+.topbar{
+  display:flex;justify-content:space-between;gap:18px;align-items:flex-start;
+  padding:18px 22px;border-bottom:1px solid #1e3329;
+  color:var(--green-dim);font-size:12px;letter-spacing:.08em;
+}
+.page{
+  position:relative;z-index:2;
+  min-height:calc(100vh - 118px);
+  padding:36px 42px 54px;
+}
+.brand{color:var(--green);letter-spacing:.12em;font-size:13px;margin-bottom:14px}
+h1,h2,p{margin-top:0}
+h1{font-weight:400;font-size:clamp(28px,4vw,58px);letter-spacing:.02em;margin-bottom:24px}
+h2{font-weight:400;font-size:clamp(22px,3vw,38px)}
+.sub{color:var(--muted);max-width:780px;line-height:1.7}
+.btnrow{display:flex;gap:12px;flex-wrap:wrap;margin-top:28px}
+.btn{
+  appearance:none;background:#0b120f;color:var(--text);
+  border:1px solid #335244;padding:13px 18px;cursor:pointer;
+  min-height:46px;
+}
+.btn:hover,.btn:focus{border-color:var(--green);color:var(--green);outline:none}
+.btn:disabled{opacity:.35;cursor:not-allowed}
+.primary{border-color:var(--green-dim);color:var(--green)}
+.warning{border-color:#775b35;color:var(--amber)}
+.statusline{
+  margin-top:18px;color:var(--amber);font-size:13px;min-height:18px
+}
+.detector-warning{
+  display:inline-block;
+  margin-top:16px;
+  padding:8px 11px;
+  border:1px solid #b24848;
+  background:rgba(104,18,18,.18);
+  color:#ff7676;
+  font-size:11px;
+  letter-spacing:.10em;
+}
+.demo-btn{
+  border-color:#53645a;
+  color:#8a9a90;
+}
+.demo-btn:hover,.demo-btn:focus{
+  border-color:#9aac9f;
+  color:#b9c7be;
+}
+
+.boot{
+  margin-top:30px;border:1px solid #1f352b;background:#060a08;padding:18px;
+  width:min(820px,100%);
+}
+.boot pre{white-space:pre-wrap;margin:0;color:var(--green);line-height:1.6;font-size:14px}
+.cursor::after{content:"_";animation:blink 1s steps(1,end) infinite}
+@keyframes blink{50%{opacity:0}}
+.cal-grid{
+  display:grid;grid-template-columns:minmax(0,1.4fr) minmax(300px,.6fr);gap:18px;align-items:start
+}
+.term{
+  min-height:460px;border:1px solid #244033;background:#050907;padding:18px;
+}
+.term pre{margin:0;white-space:pre-wrap;color:var(--green);font-size:14px;line-height:1.55}
+.sidepanel{border:1px solid #244033;background:#080d0a;padding:18px}
+.metric{padding:12px 0;border-bottom:1px solid #1f342a}
+.metric:last-child{border-bottom:none}
+.metric .k{color:var(--green-dim);font-size:11px;letter-spacing:.08em}
+.metric .v{color:var(--green);font-size:26px;margin-top:5px}
+.scene-layout{
+  display:grid;grid-template-columns:minmax(0,1fr) 360px;gap:22px;align-items:start
+}
+.scene-frame{
+  position:relative;border:1px solid #29463a;background:#090d0b;min-height:560px;overflow:hidden
+}
+.scene-image{
+  width:100%;height:560px;object-fit:cover;display:block;filter:saturate(.86) contrast(1.03)
+}
+.scene-placeholder{
+  height:560px;display:grid;place-items:center;text-align:center;padding:40px;color:var(--muted);
+  background:linear-gradient(145deg,#0f1612,#080c0a)
+}
+.overlay-monitor{
+  position:absolute;right:16px;bottom:16px;width:250px;
+  border:1px solid #244d34;background:rgba(0,8,2,.88);padding:12px;
+  color:var(--green);font-size:12px;line-height:1.55;
+  box-shadow:0 0 18px rgba(70,255,110,.08) inset;
+}
+.overlay-monitor .row{display:flex;justify-content:space-between;gap:12px}
+.overlay-monitor .fake{color:#3d754c}
+.question{border:1px solid #29463a;background:#0a0f0c;padding:20px}
+.qnum{color:var(--green-dim);font-size:12px;letter-spacing:.1em;margin-bottom:12px}
+.question p{line-height:1.55}
+.options{display:grid;gap:10px;margin-top:18px}
+.option{
+  text-align:left;background:#080c0a;border:1px solid #2f463b;color:#c9d4cc;
+  padding:13px 14px;cursor:pointer
+}
+.option:hover{border-color:var(--green);color:var(--green)}
+.transition{
+  position:absolute;inset:0;background:#030604;z-index:15;
+  display:grid;place-items:center;padding:40px;
+}
+.transition pre{color:var(--green);font-size:15px;line-height:1.7}
+.summary-grid{
+  display:grid;grid-template-columns:minmax(0,1fr) 330px;gap:18px
+}
+.summarybox,.sysbox{border:1px solid #29463a;background:#080d0a;padding:18px}
+table{width:100%;border-collapse:collapse;font-size:13px}
+th,td{border-bottom:1px solid #1e3329;padding:10px 8px;text-align:left}
+th{color:var(--green-dim);font-weight:400}
+td{color:#c9d4cc}
+.sysbox pre{color:var(--green);white-space:pre-wrap;line-height:1.7}
+.pulse{animation:pulse 2.6s ease-in-out infinite}
+@keyframes pulse{0%,100%{opacity:.82}50%{opacity:1}}
+.float{animation:float 3.2s ease-in-out infinite}
+@keyframes float{0%,100%{transform:translateY(0)}50%{transform:translateY(-6px)}}
+@media(max-width:980px){
+  .cal-grid,.scene-layout,.summary-grid{grid-template-columns:1fr}
+  .scene-image,.scene-placeholder{height:430px}
+}
+@media(max-width:560px){
+  .app{padding:0}.screen{min-height:100vh;border:0}.page{padding:26px 18px 40px}.topbar{padding:14px 18px}
+  .scene-image,.scene-placeholder{height:330px}.overlay-monitor{position:static;width:auto;border-left:0;border-right:0;border-bottom:0}
+}
+
+/* V1.4 — scene presentation + binary response layout */
+.scene-media{
+  position:relative;
+  width:100%;
+  height:560px;
+  overflow:hidden;
+  background:#070b09;
+}
+.scene-image{
+  position:absolute;
+  inset:0;
+  width:100%;
+  height:100%;
+  object-fit:cover;
+  display:block;
+  filter:saturate(.86) contrast(1.03);
+  transform:scale(1.004);
+  animation:sceneBreath 7.5s ease-in-out infinite;
+  transform-origin:center center;
+}
+@keyframes sceneBreath{
+  0%,100%{transform:scale(1.004) translateY(0)}
+  50%{transform:scale(1.012) translateY(-1px)}
+}
+.scene-layer{
+  position:absolute;
+  inset:0;
+  width:100%;
+  height:100%;
+  object-fit:cover;
+  pointer-events:none;
+}
+.scene-layer.light{
+  mix-blend-mode:screen;
+  animation:lightFlicker 3.7s steps(1,end) infinite;
+}
+@keyframes lightFlicker{
+  0%,13%,18%,42%,47%,75%,100%{opacity:.72}
+  14%{opacity:.38}
+  17%{opacity:.88}
+  43%{opacity:.52}
+  46%{opacity:.82}
+  76%{opacity:.58}
+}
+.scene-layer.float{
+  animation:objectFloat 3.4s ease-in-out infinite;
+}
+@keyframes objectFloat{
+  0%,100%{transform:translateY(0)}
+  50%{transform:translateY(-8px)}
+}
+.scene-layer.breath{
+  animation:objectBreath 5.5s ease-in-out infinite;
+  transform-origin:center 62%;
+}
+@keyframes objectBreath{
+  0%,100%{transform:scale(1)}
+  50%{transform:scale(1.008)}
+}
+.scene-glow{
+  position:absolute;inset:0;pointer-events:none;
+  background:
+    radial-gradient(circle at 24% 32%, rgba(92,255,126,.045), transparent 25%),
+    linear-gradient(90deg, transparent 0 48%, rgba(107,255,146,.025) 52%, transparent 58%);
+  animation:ambientSweep 6.8s linear infinite;
+  mix-blend-mode:screen;
+}
+@keyframes ambientSweep{
+  0%{transform:translateX(-7%);opacity:.55}
+  50%{opacity:.9}
+  100%{transform:translateX(7%);opacity:.55}
+}
+.scene-sync{
+  position:absolute;left:0;right:0;height:2px;top:-4px;
+  background:rgba(124,255,156,.42);
+  box-shadow:0 0 12px rgba(124,255,156,.28);
+  pointer-events:none;
+  animation:syncSweep 5.2s linear infinite;
+}
+@keyframes syncSweep{
+  0%{top:-4px;opacity:0}
+  4%{opacity:.8}
+  92%{opacity:.35}
+  100%{top:101%;opacity:0}
+}
+.question{
+  min-height:560px;
+  display:flex;
+  flex-direction:column;
+}
+.question-copy{flex:1}
+.binary-options{
+  grid-column:1 / -1;
+  display:grid;
+  grid-template-columns:1fr 1fr;
+  gap:18px;
+  margin-top:18px;
+}
+.option{
+  position:relative;
+  min-height:92px;
+  display:flex;
+  align-items:center;
+  gap:16px;
+  text-align:left;
+  background:#070c09;
+  border:1px solid #315043;
+  color:#c9d4cc;
+  padding:17px 18px;
+  cursor:pointer;
+  transition:border-color .15s ease, background .15s ease, color .15s ease;
+}
+.option-code{
+  flex:0 0 auto;
+  display:grid;
+  place-items:center;
+  width:48px;height:48px;
+  border:1px solid #365b49;
+  color:var(--green);
+  font-size:22px;
+}
+.option-text{
+  font-size:14px;
+  line-height:1.45;
+  letter-spacing:.02em;
+}
+.option::after{
+  content:"SELECT";
+  position:absolute;
+  right:14px;bottom:9px;
+  color:#2f6841;
+  font-size:9px;
+  letter-spacing:.12em;
+}
+.option:hover,.option:focus{
+  border-color:var(--green);
+  color:var(--green);
+  background:#0a130e;
+  outline:none;
+}
+.option:hover .option-code,.option:focus .option-code{
+  border-color:var(--green);
+}
+.option:disabled{opacity:.45;cursor:default}
+.scene-caption{
+  position:absolute;
+  left:14px;top:14px;
+  padding:5px 7px;
+  background:rgba(2,8,4,.74);
+  border:1px solid rgba(81,140,99,.38);
+  color:#4d8e60;
+  font-size:10px;
+  letter-spacing:.12em;
+  pointer-events:none;
+}
+@media(max-width:980px){
+  .scene-media{height:430px}
+  .question{min-height:auto}
+}
+@media(max-width:620px){
+  .binary-options{grid-template-columns:1fr}
+  .scene-media{height:330px}
+  .option{min-height:78px}
+}
+
+
+
+/* V1.7 — state procedural test module headings */
+.scene-program-title{
+  margin:10px 0 16px;
+  padding:12px 15px 13px;
+  border-left:3px solid var(--green);
+  border-top:1px solid #29463a;
+  border-bottom:1px solid #29463a;
+  background:linear-gradient(90deg,rgba(29,73,43,.20),rgba(4,10,7,0));
+  box-shadow:0 0 24px rgba(124,255,156,.035) inset;
+}
+.scene-program-code{
+  color:var(--green-dim);
+  font-size:10px;
+  letter-spacing:.16em;
+  margin-bottom:5px;
+}
+.scene-program-name{
+  color:var(--green);
+  font-size:clamp(18px,2.1vw,28px);
+  line-height:1.15;
+  letter-spacing:.075em;
+  text-transform:uppercase;
+  text-shadow:0 0 10px rgba(124,255,156,.16);
+}
+.scene-layer.ab{
+  z-index:8;
+  mix-blend-mode:normal;
+  animation:none;
+  pointer-events:none;
+}
+
+/* V1.6 — compliance level result */
+.level-card{
+  border:1px solid #29463a;
+  background:#060b08;
+  padding:22px;
+  margin-bottom:18px;
+}
+.level-kicker{
+  color:var(--green-dim);
+  font-size:11px;
+  letter-spacing:.12em;
+  margin-bottom:10px;
+}
+.level-line{
+  display:flex;
+  align-items:baseline;
+  gap:14px;
+  flex-wrap:wrap;
+}
+.level-number{
+  color:var(--green);
+  font-size:clamp(54px,8vw,104px);
+  line-height:.9;
+  font-weight:400;
+}
+.level-title{
+  color:#d7e4db;
+  font-size:clamp(18px,2.5vw,32px);
+  letter-spacing:.04em;
+}
+.level-message{
+  margin-top:16px;
+  color:#9fb1a5;
+  line-height:1.65;
+  max-width:760px;
+}
+.level-meta{
+  display:grid;
+  grid-template-columns:repeat(3,minmax(0,1fr));
+  gap:10px;
+  margin-top:18px;
+}
+.level-meta .mini{
+  border:1px solid #1f342a;
+  padding:10px 12px;
+  background:#09100c;
+}
+.level-meta .mk{
+  color:#5d7d69;
+  font-size:10px;
+  letter-spacing:.09em;
+}
+.level-meta .mv{
+  color:var(--green);
+  margin-top:4px;
+  font-size:14px;
+}
+@media(max-width:700px){
+  .level-meta{grid-template-columns:1fr}
+}
+
+@media(prefers-reduced-motion:reduce){
+  *{animation:none!important}
+}
+
+/* V1.9 — fixed desktop terminal layout */
+html,body{
+  width:100%;
+  height:100%;
+  overflow:hidden;
+}
+body{min-height:0}
+.app{
+  width:100vw;
+  height:100vh;
+  max-width:none;
+  margin:0;
+  padding:18px;
+}
+.screen{
+  width:100%;
+  height:calc(100vh - 36px);
+  min-height:0;
+}
+.page{
+  height:calc(100% - 55px);
+  min-height:0;
+}
+.page:not(#pageScene){
+  overflow:auto;
+}
+#pageScene:not(.hidden){
+  display:flex;
+  flex-direction:column;
+  overflow:hidden;
+  padding:22px 28px 26px;
+}
+#pageScene .brand{
+  flex:0 0 auto;
+  margin-bottom:8px;
+}
+#pageScene .scene-program-title{
+  flex:0 0 auto;
+  margin:4px 0 12px;
+  padding:9px 13px 10px;
+}
+#pageScene .scene-program-code{
+  font-size:9px;
+  margin-bottom:4px;
+}
+#pageScene .scene-program-name{
+  font-size:clamp(17px,1.65vw,24px);
+}
+#pageScene .scene-layout{
+  flex:1 1 auto;
+  min-height:0;
+  display:grid;
+  grid-template-columns:minmax(0,1fr) 370px;
+  gap:18px;
+  align-items:stretch;
+}
+#pageScene .scene-frame{
+  height:100%;
+  min-height:0;
+}
+#pageScene .scene-media{
+  height:100%;
+  min-height:0;
+}
+#pageScene .scene-image,
+#pageScene .scene-placeholder{
+  height:100%;
+}
+
+/* Right-hand control console */
+.control-panel{
+  height:100%;
+  min-height:0;
+  border:1px solid #29463a;
+  background:#0a0f0c;
+  padding:14px;
+  display:flex;
+  flex-direction:column;
+  gap:12px;
+}
+.control-panel .qnum{
+  margin:0;
+  flex:0 0 auto;
+}
+.data-window{
+  flex:1 1 auto;
+  min-height:0;
+  border:1px solid #244d34;
+  background:#020604;
+  box-shadow:
+    0 0 22px rgba(70,255,110,.07) inset,
+    0 0 0 1px rgba(124,255,156,.025);
+  display:flex;
+  flex-direction:column;
+  overflow:hidden;
+}
+.data-window-bar{
+  flex:0 0 auto;
+  display:flex;
+  justify-content:space-between;
+  gap:14px;
+  align-items:center;
+  padding:8px 10px;
+  border-bottom:1px solid #173222;
+  color:var(--green-dim);
+  font-size:9px;
+  letter-spacing:.13em;
+  background:#061009;
+}
+.data-window-bar .live{
+  color:var(--green);
+}
+.live-metrics{
+  flex:0 0 auto;
+  display:grid;
+  grid-template-columns:1fr 1fr;
+  border-bottom:1px solid #173222;
+}
+.live-metrics .m{
+  padding:8px 10px;
+  border-right:1px solid #13291c;
+  border-bottom:1px solid #13291c;
+}
+.live-metrics .m:nth-child(2n){border-right:0}
+.live-metrics .k{
+  color:#3f7951;
+  font-size:9px;
+  letter-spacing:.08em;
+}
+.live-metrics .v{
+  color:var(--green);
+  font-size:15px;
+  margin-top:2px;
+}
+.data-scroll{
+  flex:1 1 auto;
+  min-height:90px;
+  overflow-y:auto;
+  overflow-x:hidden;
+  scrollbar-width:thin;
+  scrollbar-color:#315b40 #061009;
+  padding:9px 10px 14px;
+}
+.data-scroll::-webkit-scrollbar{width:8px}
+.data-scroll::-webkit-scrollbar-track{background:#061009}
+.data-scroll::-webkit-scrollbar-thumb{
+  background:#315b40;
+  border:2px solid #061009;
+}
+.data-log{
+  margin:0;
+  white-space:pre-wrap;
+  word-break:break-word;
+  color:#67bd7e;
+  font-size:10px;
+  line-height:1.55;
+}
+.response-block{
+  flex:0 0 auto;
+  border-top:1px solid #1f342a;
+  padding-top:11px;
+}
+.response-instruction{
+  color:var(--green-dim);
+  font-size:9px;
+  line-height:1.5;
+  letter-spacing:.08em;
+  margin-bottom:9px;
+}
+#pageScene .binary-options{
+  display:grid;
+  grid-template-columns:1fr 1fr;
+  gap:10px;
+  margin:0;
+}
+#pageScene .option{
+  min-height:68px;
+  padding:12px;
+  justify-content:center;
+  text-align:center;
+}
+#pageScene .option-text{
+  font-size:20px;
+  color:var(--green);
+  letter-spacing:.14em;
+}
+#pageScene .option::after{
+  content:"COMMIT";
+  right:8px;
+  bottom:6px;
+  font-size:8px;
+}
+#pageScene .overlay-monitor{
+  display:none!important;
+}
+
+/* This project is presented as a desktop terminal, not a mobile page. */
+@media(max-width:980px){
+  #pageScene .scene-layout{
+    grid-template-columns:minmax(0,1fr) 330px;
+  }
+}
+
+
+/* V1.9.1 — preserve the complete 2048×1448 scene image */
+#pageScene .scene-layout{
+  grid-template-columns:minmax(0,1fr) 340px;
+  gap:14px;
+}
+#pageScene .scene-frame{
+  display:flex;
+  align-items:stretch;
+  justify-content:center;
+  background:#030504;
+}
+#pageScene .scene-media{
+  position:relative;
+  width:100%;
+  height:100%;
+  min-height:0;
+  overflow:hidden;
+  background:#030504;
+}
+#pageScene .scene-image,
+#pageScene .scene-layer{
+  position:absolute;
+  inset:0;
+  width:100%;
+  height:100%;
+  object-fit:contain !important;
+  object-position:center center;
+}
+#pageScene .scene-image{
+  transform:none !important;
+  animation:sceneDisplayBreath 6.5s ease-in-out infinite;
+}
+@keyframes sceneDisplayBreath{
+  0%,100%{filter:saturate(.86) contrast(1.03) brightness(.985)}
+  50%{filter:saturate(.86) contrast(1.03) brightness(1.015)}
+}
+#pageScene .scene-placeholder{
+  position:absolute;
+  inset:0;
+  width:100%;
+  height:100%;
+}
+#pageScene .scene-caption{display:none!important;}
+
+</style>
+</head>
+<body>
+<div class="app">
+  <div class="screen crt-flicker">
+    <div class="topbar">
+      <div>TAIA / CIVIC COMPLIANCE ASSESSMENT</div>
+      <div id="topStatus">TERMINAL STANDBY</div>
+    </div>
+
+    <!-- START -->
+    <section class="page" id="pageStart">
+      <div class="brand">TEMPORAL ARRIVAL & INTEGRATION AUTHORITY</div>
+      <h1>CIVIC COMPLIANCE<br>ASSESSMENT</h1>
+      <p class="sub">Terminal interface for procedural compliance screening. Biological input must remain connected throughout the assessment.</p>
+      <div class="boot"><pre id="startBoot">&gt; TERMINAL NODE .............. READY
+&gt; BIOLOGICAL INPUT ............ NOT CONNECTED
+&gt; ASSESSMENT STATE ............ STANDBY
+&gt; SESSION BUFFER .............. EMPTY</pre></div>
+      <div id="detectorWarning" class="detector-warning">PLEASE CONNECT DETECTOR</div>
+      <div class="btnrow">
+        <button class="btn primary" id="connectBegin">CONNECT &amp; BEGIN</button>
+        <button class="btn demo-btn" id="demoBegin">DEMO MODE / NO HEART-RATE INPUT</button>
+      </div>
+      <div class="statusline" id="startStatus">Awaiting operator input.</div>
+    </section>
+
+    <!-- PURPOSE / CALIBRATION -->
+    <section class="page hidden" id="pageCal">
+      <div class="brand">ASSESSMENT PURPOSE / BIOLOGICAL CALIBRATION</div>
+      <div class="cal-grid">
+        <div>
+          <h2>PROCEDURAL COMPLIANCE SCREENING</h2>
+          <p class="sub">This assessment evaluates procedural compliance under conflicting civic guidance. Respond according to the action you consider most appropriate. Your physiological response will be recorded throughout the procedure.</p>
+          <div class="term"><pre id="calTerminal" class="cursor">&gt; INITIALISING BIOLOGICAL INPUT...</pre></div>
+          <div class="btnrow">
+            <button class="btn primary" id="beginAssessment" disabled>BEGIN ASSESSMENT</button>
+          </div>
+        </div>
+        <aside class="sidepanel">
+          <div class="metric"><div class="k">HR.CUR</div><div class="v" id="calHr">---</div></div>
+          <div class="metric"><div class="k">HR.BASE</div><div class="v" id="calBase">---</div></div>
+          <div class="metric"><div class="k">SIGNAL STATE</div><div class="v" id="calSig">ACQUIRING</div></div>
+          <div class="metric"><div class="k">REFERENCE WINDOW</div><div class="v" id="calWindow">CLOSED</div></div>
+        </aside>
+      </div>
+    </section>
+
+    <!-- SCENE -->
+    <section class="page hidden" id="pageScene">
+      <div class="brand" id="sceneHeader">SCENARIO 01 / 06</div>
+
+      <div class="scene-program-title">
+        <div class="scene-program-code" id="sceneProgramCode">STATE CIVIC PROCEDURE TEST / MODULE 01</div>
+        <div class="scene-program-name" id="sceneProgramTitle">TRANSPORT ROUTE STANDARDIZATION</div>
+      </div>
+
+      <div class="scene-layout">
+        <div class="scene-frame">
+          <div class="scene-media">
+            <img id="sceneImg" class="scene-image" alt="">
+            <img id="sceneBreathLayer" class="scene-layer breath hidden" alt="">
+            <img id="sceneLightLayer" class="scene-layer light hidden" alt="">
+            <img id="sceneFloatLayer" class="scene-layer float hidden" alt="">
+            <img id="sceneABLayer" class="scene-layer ab hidden" alt="">
+            <div class="scene-glow"></div>
+            <div class="scene-sync"></div>
+<div id="scenePlaceholder" class="scene-placeholder">
+              <div>
+                <div style="color:var(--green);font-size:18px;margin-bottom:10px">SCENE IMAGE PLACEHOLDER</div>
+                <div>Put your images in <b>assets/scene 01.png</b> ... <b>assets/scene 06.png</b></div>
+              </div>
+            </div>
+          </div>
+
+          <div class="transition hidden" id="transition">
+            <pre id="transitionText">&gt; RESPONSE COMMITTED
+&gt; WRITING EVENT...
+&gt; UPDATING SUBJECT MODEL...
+&gt; LOADING NEXT PROCEDURE...</pre>
+          </div>
+        </div>
+
+        <aside class="control-panel">
+          <div class="qnum" id="qnum">SCENARIO 01 / 06</div>
+
+          <div class="data-window">
+            <div class="data-window-bar">
+              <span>BIOLOGICAL DATA / ITERATION STREAM</span>
+              <span class="live">REC ● ACTIVE</span>
+            </div>
+
+            <div class="live-metrics">
+              <div class="m"><div class="k">HR.CUR</div><div class="v" id="monCur">---</div></div>
+              <div class="m"><div class="k">HR.AVG5</div><div class="v" id="monAvg">---</div></div>
+              <div class="m"><div class="k">HR.BASE</div><div class="v" id="monBase">---</div></div>
+              <div class="m"><div class="k">ΔR</div><div class="v" id="monDelta">---</div></div>
+              <div class="m"><div class="k">T+</div><div class="v" id="monTime">00.00</div></div>
+              <div class="m"><div class="k">NODE</div><div class="v" id="monNode">01</div></div>
+            </div>
+
+            <div class="data-scroll" id="dataScroll">
+              <pre class="data-log" id="dataLog">&gt; STREAM INITIALISING...</pre>
+            </div>
+
+            <span id="fakePx" class="hidden">1147</span>
+            <span id="fakeSync" class="hidden">0.982</span>
+          </div>
+
+          <div class="response-block">
+            <div class="response-instruction">
+              SELECT ONE RESPONSE.<br>
+              RESPONSE CANNOT BE REVISED AFTER COMMIT.
+            </div>
+            <div class="binary-options" id="options"></div>
+          </div>
+        </aside>
+      </div>
+    </section>
+
+    <!-- SUMMARY -->
+    <section class="page hidden" id="pageSummary">
+      <div class="brand">ASSESSMENT COMPLETE</div>
+      <h2>SESSION DATA SUMMARY</h2>
+      <p class="sub">Automated civic classification issued from behavioural responses. Physiological data remains supplementary and does not alter classification.</p>
+
+      <div class="level-card">
+        <div class="level-kicker">STATE CIVIC COMPLIANCE CLASSIFICATION</div>
+        <div class="level-line">
+          <div class="level-number" id="resultLevel">--</div>
+          <div class="level-title" id="resultTitle">PENDING CLASSIFICATION</div>
+        </div>
+        <div class="level-message" id="resultMessage">Awaiting assessment completion.</div>
+
+        <div class="level-meta">
+          <div class="mini">
+            <div class="mk">COMPLIANCE SCORE</div>
+            <div class="mv" id="resultScore">-- / 09</div>
+          </div>
+          <div class="mini">
+            <div class="mk">ACCESS STATUS</div>
+            <div class="mv" id="resultAccess">PENDING</div>
+          </div>
+          <div class="mini">
+            <div class="mk">SUPERVISION</div>
+            <div class="mv" id="resultSupervision">PENDING</div>
+          </div>
+        </div>
+      </div>
+
+      <div class="summary-grid">
+        <div class="summarybox">
+          <table>
+            <thead><tr><th>TEST</th><th>RESP.</th><th>RT</th><th>HR AVG</th><th>ΔHR</th></tr></thead>
+            <tbody id="summaryRows"></tbody>
+          </table>
+        </div>
+        <div class="sysbox">
+          <pre id="summarySystem"></pre>
+          <div class="btnrow">
+            <button class="btn warning" id="resetTerminal">RESET TERMINAL</button>
+          </div>
+        </div>
+      </div>
+    </section>
+  </div>
+</div>
+
+<script>
+const $ = id => document.getElementById(id);
+
+// ---------- EDIT THESE LATER ----------
+const scenes = [
+  {
+    title:"SCENE 01",
+    theme:"TRANSPORT ROUTE STANDARDIZATION",
+        options:["OPTION A","OPTION B"],
+    image:"assets/scene 01.png",
+    breath:"assets/scene 01 breath.png",
+    light:"assets/scene 01 light.png",
+    float:"assets/scene 01 float.png",
+    ab:"assets/ab1.png",
+    compliantChoice:"A",
+    complianceWeight:1
+  },
+  {
+    title:"SCENE 02",
+    theme:"INSTITUTIONAL ACCESS VERIFICATION",
+        options:["OPTION A","OPTION B"],
+    image:"assets/scene 02.png",
+    breath:"assets/scene 02 breath.png",
+    light:"assets/scene 02 light.png",
+    float:"assets/scene 02 float.png",
+    ab:"assets/ab2.png",
+    compliantChoice:"B",
+    complianceWeight:1
+  },
+  {
+    title:"SCENE 03",
+    theme:"SAFETY DIRECTIVE RECONCILIATION",
+        options:["OPTION A","OPTION B"],
+    image:"assets/scene 03.png",
+    breath:"assets/scene 03 breath.png",
+    light:"assets/scene 03 light.png",
+    float:"assets/scene 03 float.png",
+    ab:"assets/ab3.png",
+    compliantChoice:"A",
+    complianceWeight:1
+  },
+  {
+    title:"SCENE 04",
+    theme:"CIVIC RESOURCE DISTRIBUTION",
+        options:["OPTION A","OPTION B"],
+    image:"assets/scene 04.png",
+    breath:"assets/scene 04 breath.png",
+    light:"assets/scene 04 light.png",
+    float:"assets/scene 04 float.png",
+    ab:"assets/ab4.png",
+    compliantChoice:"A",
+    complianceWeight:2
+  },
+  {
+    title:"SCENE 05",
+    theme:"COLLECTIVE MOVEMENT REGULATION",
+        options:["OPTION A","OPTION B"],
+    image:"assets/scene 05.png",
+    breath:"assets/scene 05 breath.png",
+    light:"assets/scene 05 light.png",
+    float:"assets/scene 05 float.png",
+    ab:"assets/ab5.png",
+    compliantChoice:"B",
+    complianceWeight:2
+  },
+  {
+    title:"SCENE 06",
+    theme:"SECURITY SCREENING COMPLIANCE",
+        options:["OPTION A","OPTION B"],
+    image:"assets/scene 06.png",
+    breath:"assets/scene 06 breath.png",
+    light:"assets/scene 06 light.png",
+    float:"assets/scene 06 float.png",
+    ab:"assets/ab6.png",
+    compliantChoice:"B",
+    complianceWeight:2
+  }
+];
+
+// ---------- SERIAL ----------
+let port=null, reader=null, keepReading=false, serialBuffer="";
+let demoMode=false;
+let bpmHistory=[];
+let currentBPM=null;
+const HISTORY_LIMIT=60000;
+
+function pruneHistory(now=Date.now()){
+  const cutoff=now-HISTORY_LIMIT;
+  while(bpmHistory.length && bpmHistory[0].t<cutoff) bpmHistory.shift();
+}
+function avgWindow(ms, end=Date.now()){
+  const start=end-ms;
+  const data=bpmHistory.filter(x=>x.t>=start && x.t<=end && x.bpm>0);
+  if(!data.length) return null;
+  return data.reduce((a,x)=>a+x.bpm,0)/data.length;
+}
+let lastSignalAt=0;
+let signalReadySince=null;
+let calibrationStarted=false;
+
+function parseLine(line){
+  const m=line.trim().match(/BPM:\s*(-?\d+(?:\.\d+)?)/i);
+  if(!m) return;
+  const bpm=Number(m[1]);
+
+  if(!Number.isFinite(bpm) || bpm<=0){
+    currentBPM=null;
+    signalReadySince=null;
+    if(!$('pageCal').classList.contains('hidden') && !calibrationStarted){
+      $('calHr').textContent='---';
+      $('calSig').textContent='ACQUIRING';
+    }
+    return;
+  }
+
+  currentBPM=bpm;
+  lastSignalAt=Date.now();
+  bpmHistory.push({t:Date.now(),bpm});
+  pruneHistory();
+  updateLiveMonitor();
+
+  // Update calibration readout whenever valid BPM arrives.
+  if(!$('pageCal').classList.contains('hidden')){
+    $('calHr').textContent=Math.round(bpm);
+    $('calSig').textContent='DETECTED';
+  }
+}
+async function connectSerial(){
+  if(!("serial" in navigator)) throw new Error("Use Chrome or Edge with Web Serial support.");
+  port=await navigator.serial.requestPort();
+  await port.open({baudRate:115200});
+  keepReading=true;
+  const decoder=new TextDecoder();
+  (async()=>{
